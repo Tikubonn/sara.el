@@ -65,6 +65,9 @@
 (defmacro sara-read ()
   `(read--expression ""))
 
+(defmacro sara-exit ()
+  `(kill-emacs))
+
 (defmacro sara-send (sara object)
   `(sara-process-write ,sara (format "%S\n" ,object)))
 
