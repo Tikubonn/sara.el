@@ -25,21 +25,27 @@ I write the todos to *section of todo*.
 
 * `(sara-eof SARA)`
     * close a process of argument of *SARA*.
+    if process was already closed, this dont close the process.
 
 * `(sara-kill SARA)`
     * send a kill signal to argument of *SARA*.
+    if process was already closed, this dont send a signal.
     
 * `(sara-quit SARA)`
     * send a quit signal to argument of *SARA*.
+    if process was already closed, this dont send a signal.
 
 * `(sara-interrupt SARA)`
     * send a intrrupt signal to argument of *SARA*.
+    if process was already closed, this dont send a signal.
 
 * `(sara-stop SARA)`
     * send a stop signal to argument of *SARA*.
+    if process was already closed, this dont send a signal.
 
 * `(sara-continue SARA)`
     * send a continue signal to argument of *SARA*.
+    if process was already closed, this dont send a signal.
 
 # todo
 
