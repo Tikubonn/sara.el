@@ -65,8 +65,8 @@
 (defmacro sara-read ()
   `(read--expression ""))
 
-(defmacro sara-send (sara data)
-  `(sara-process-write ,sara (format "%S\n" ,data)))
+(defmacro sara-send (sara object)
+  `(sara-process-write ,sara (format "%S\n" ,object)))
 
 (defmacro sara-set-onread (sara func)
   `(sara-when-process-alive ,sara
@@ -89,35 +89,59 @@
 
 ;; define public process methods
 
-(defmacro sara-eof (sara)
-  `(prog1 ,sara
-     (sara-when-process-alive ,sara
-       (process-send-eof (get-sara-process ,sara)))))
+(defun sara-eof (sara)
 
-(defmacro sara-kill (sara)
-  `(prog1 ,sara
-     (sara-when-process-alive ,sara
-       (kill-process (get-sara-process ,sara)))))
+  "close a process of an argument of sara. 
+if process was not alive, this not close the process."
+  
+   (prog1 sara
+       (sara-when-process-alive sara
+         (process-send-eof (get-sara-process sara)))))
 
-(defmacro sara-quit (sara)
-  `(prog1 ,sara
-     (sara-when-process-alive ,sara
-       (quit-process (get-sara-process ,sara)))))
+(defun sara-kill (sara)
 
-(defmacro sara-interrupt (sara)
-  `(prog1 ,sara
-     (sara-when-process-alive ,sara
-       (interrupt-process (get-sara-process ,sara)))))
+  "send a kill signal to an argument of sara.
+if process was not alive, this not send a signal."
+  
+   (prog1 sara
+       (sara-when-process-alive sara
+         (kill-process (get-sara-process sara)))))
 
-(defmacro sara-stop (sara)
-  `(prog1 ,sara
-     (sara-when-process-alive ,sara
-       (stop-process (get-sara-process ,sara)))))
+(defun sara-quit (sara)
 
-(defmacro sara-continue (sara)
-  `(prog1 ,sara
-     (sara-when-process-alive ,sara
-       (continue-process (get-sara-process ,sara)))))
+  "send a quit signal to an argument of sara.
+if process was not alive, this not send a signal."
+  
+   (prog1 sara
+       (sara-when-process-alive sara
+         (quit-process (get-sara-process sara)))))
+
+(defun sara-interrupt (sara)
+
+  "send a interrupt signal to an argument of sara.
+if process was not alive, this not send a signal."
+  
+   (prog1 sara
+       (sara-when-process-alive sara
+         (interrupt-process (get-sara-process sara)))))
+
+(defun sara-stop (sara)
+
+  "send a stop signal to an argument of sara.
+if process was not alive, this not send a signal."
+  
+   (prog1 sara
+       (sara-when-process-alive sara
+         (stop-process (get-sara-process sara)))))
+
+(defun sara-continue (sara)
+
+  "send a continue signal to an argument of sara.
+if process was not alive, this not send a signal."
+  
+   (prog1 sara
+       (sara-when-process-alive sara
+         (continue-process (get-sara-process sara)))))
 
 ;; sara internal methods
 
@@ -138,7 +162,7 @@
 
 ;; main
 
-(defmacro sara (&rest rest)
+(defmacro sara (&rest body)
   (let*
     ((filename (sara-temp-filename))
       (tempbuff (sara-temp-buffer))
@@ -147,7 +171,7 @@
       (symprocess (gensym))
       (symsara (gensym)))
     `(progn
-       (sara-write-file ,filename ,@(mapcar 'macroexpand-all rest))
+       (sara-write-file ,filename ,@(mapcar 'macroexpand-all body))
        (sara-compile-file ,filename)
        (let*
          ((,symprocess (sara-run ,tempname ,tempbuff ,formula))
@@ -157,10 +181,10 @@
 (defmacro sara-run (name buffer formula)
   `(start-process ,name ,buffer "emacs" "--quick" "--batch" "--eval" ,formula))
 
-(defmacro sara-write-file (filename &rest rest)
+(defmacro sara-write-file (filename &rest body)
   (with-current-buffer
     (find-file filename)
-    (dolist (form rest)
+    (dolist (form body)
       (print form (current-buffer)))
     (save-buffer)
     (kill-buffer)))
