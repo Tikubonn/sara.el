@@ -1,4 +1,13 @@
 
+;; test code
+
+(push (file-truename ".") load-path)
+
+;; require some packages
+
+(require 'cl)
+(require 'sara-util)
+
 ;; define temp directory
 
 (defvar sara-temp-directory
@@ -47,20 +56,26 @@
 
 ;; define util methods
 
-(defmacro sara-live-p (sara)
-  `(and (get-sara-process ,sara)
-     (process-live-p (get-sara-process ,sara))))
+(defun sara-live-p (sara)
+
+  "this return a boolean, that is process of sara was alive or not."
+  
+  (and (get-sara-process sara)
+    (process-live-p (get-sara-process sara))))
 
 (defmacro sara-when-process-alive (sara &rest rest)
   `(when (sara-live-p ,sara) ,@rest))
 
+(defmacro sara-if-process-alive (sara then &rest  else)
+  `(if (sara-live-p ,sara) ,then ,@else))
+
 ;; define internal methods
 
-(defmacro sara-process-write (sara text)
-  `(sara-when-process-alive ,sara
-     (process-send-string (get-sara-process ,sara) ,text)))
+(defun sara-process-write (sara text)
+  (sara-when-process-alive sara
+    (process-send-string (get-sara-process sara) text)))
 
-;; define public io methods
+;; public methods for child process.
 
 (defmacro sara-read ()
   `(read--expression ""))
@@ -68,27 +83,22 @@
 (defmacro sara-exit ()
   `(kill-emacs))
 
-(defmacro sara-send (sara object)
-  `(sara-process-write ,sara (format "%S\n" ,object)))
+;; public methods for parent process.
 
-(defmacro sara-set-onread (sara func)
-  `(sara-when-process-alive ,sara
-     (set-process-filter
-       (get-sara-process ,sara)
-       (sara-set-onread-function ,func))))
+(defun sara-send (sara object)
+  (sara-process-write sara (format "%S\n" object)))
 
-(defmacro sara-set-onread-function (func)
-  `(lambda (process text)
-     (let ((sara (get-sara-alist process)))
-       (when sara
-         (setf (get-sara-buffer sara)
-           (concat (get-sara-buffer sara) text))
-         (while
-           (let ((readone (ignore-errors (read-from-string (get-sara-buffer sara)))))             
-             (when readone
-               (setf (get-sara-buffer sara)
-                 (subseq (get-sara-buffer sara) (cdr readone)))
-               (funcall ,func (car readone)))))))))
+(defun sara-set-onread (sara func)
+  (sara-when-process-alive sara
+    (set-process-filter
+      (get-sara-process sara)
+      (sara-set-onread-function func))))
+
+(defun sara-set-onread--default (process text)
+  (let ((sara (get-sara-alist process)))
+    (when sara
+      (setf (get-sara-buffer sara)
+        (concat (get-sara-buffer sara) text)))))
 
 ;; define public process methods
 
@@ -163,34 +173,26 @@ if process was not alive, this not send a signal."
 (defmacro sara-load-formula (filename)
   `(format "(load %S nil t)" ,filename))
 
+;; define macros
+
+(defmacro with-sara (sara-name sara-formula &rest body)
+  `(let ((,sara-name (sara ,sara-formula))) ,@body
+     (sara-eof ,sara-name)
+     (sara-kill ,sara-name)))
+
 ;; main
 
 (defmacro sara (&rest body)
   (let*
     ((filename (sara-temp-filename))
       (tempbuff (sara-temp-buffer))
-      (tempname (sara-temp-name))
-      (formula (sara-load-formula filename))        
+      (tempname (sara-temp-name))        
       (symprocess (gensym))
       (symsara (gensym)))
-    `(progn
-       (sara-write-file ,filename ,@(mapcar 'macroexpand-all body))
-       (sara-compile-file ,filename)
-       (let*
-         ((,symprocess (sara-run ,tempname ,tempbuff ,formula))
+    (sara--write-file filename (mapcar 'macroexpand-all body))
+    (sara--compile-file filename)    
+    (let ((,symprocess (sara--open ,tempname ,tempbuffer ,filename))
            (,symsara (make-sara ,symprocess)))
-         (prog1 ,symsara (add-sara-alist ,symprocess ,symsara))))))
-
-(defmacro sara-run (name buffer formula)
-  `(start-process ,name ,buffer "emacs" "--quick" "--batch" "--eval" ,formula))
-
-(defmacro sara-write-file (filename &rest body)
-  (with-current-buffer
-    (find-file filename)
-    (dolist (form body)
-      (print form (current-buffer)))
-    (save-buffer)
-    (kill-buffer)))
-
-(defmacro sara-compile-file (filename)
-  (byte-compile-file filename))
+      (prog1 ,symsara
+        (sara-set-onread ,symsara 'sara-set-onread--default)
+        (add-sara-alist ,symprocess ,symsara)))))
